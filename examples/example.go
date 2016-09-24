@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"github.com/nsf/termbox-go"
-	"github.com/jonvaldes/timgui"
+	"github.com/jonvaldes/timui"
 )
 
 type Data struct {
@@ -14,24 +14,24 @@ type Data struct {
 	otherDir string
 }
 
-func redraw(state *timgui.State, data *Data) {
+func redraw(state *timui.State, data *Data) {
 	termbox.Clear(state.Colors.Default, state.Colors.Default)
 
-	timgui.Box(state, 2, 1, "Commands",
-		&timgui.CheckBox{&data.tree, "tree"},
-		&timgui.CheckBox{&data.ls, "ls"},
+	timui.Box(state, 2, 1, "Commands",
+		&timui.CheckBox{&data.tree, "tree"},
+		&timui.CheckBox{&data.ls, "ls"},
 	)
 
-	timgui.Box(state, 16, 1, "Dirs",
-		&timgui.RadioBox{0, &data.selectedDir, "/"},
-		&timgui.RadioBox{1, &data.selectedDir, "~"},
-		&timgui.RadioBox{2, &data.selectedDir, "~/Downloads"},
-		&timgui.RadioBox{5, &data.selectedDir, "Other:"},
-		&timgui.TextEdit{&data.otherDir},
+	timui.Box(state, 16, 1, "Dirs",
+		&timui.RadioBox{0, &data.selectedDir, "/"},
+		&timui.RadioBox{1, &data.selectedDir, "~"},
+		&timui.RadioBox{2, &data.selectedDir, "~/Downloads"},
+		&timui.RadioBox{5, &data.selectedDir, "Other:"},
+		&timui.TextEdit{&data.otherDir},
 	)
 
-	timgui.Box(state, 38, 1, "",
-		&timgui.Button{"Run!", func() {
+	timui.Box(state, 38, 1, "",
+		&timui.Button{"Run!", func() {
 			termbox.Close()
 			os.Exit(0)
 		}},
@@ -46,7 +46,7 @@ func main() {
 
 	data := Data{}
 
-	state := timgui.NewState()
+	state := timui.NewState()
 	state.Colors.Selected = termbox.ColorCyan
 	state.Colors.Cursor = termbox.ColorCyan | termbox.AttrBold
 	redraw(&state, &data)

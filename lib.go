@@ -1,13 +1,15 @@
-package timgui
+package timui
 
 import (
 	"github.com/nsf/termbox-go"
 )
 
+// Coords defines screen or UI coordinates
 type Coords struct {
 	x, y int
 }
 
+// State carries all global information for the UI
 type State struct {
 	Cursor Coords
 	Colors struct {
@@ -21,12 +23,14 @@ type State struct {
 	boxesCnt    int
 }
 
+// NewState returns a new State
 func NewState() State {
 	result := State{}
 	result.KeyState = make(map[termbox.Key]bool)
 	return result
 }
 
+// HandleEvent registers an event in the UI system
 func (state *State) HandleEvent(ev termbox.Event) {
 	if ev.Type == termbox.EventKey {
 		state.KeyState[ev.Key] = true
@@ -34,6 +38,7 @@ func (state *State) HandleEvent(ev termbox.Event) {
 	}
 }
 
+// Flush resets the UI for the next frame
 func (state *State) Flush() {
 	if state.Cursor.x >= state.boxesCnt {
 		state.Cursor.x = state.boxesCnt - 1
@@ -44,6 +49,7 @@ func (state *State) Flush() {
 	state.KeyState = make(map[termbox.Key]bool)
 }
 
+// WriteText writes a line of text at the given position, with the specified attribs
 func WriteText(x, y int, text string, fg, bg termbox.Attribute) {
 	dx := 0
 	for _, r := range text {
@@ -52,6 +58,7 @@ func WriteText(x, y int, text string, fg, bg termbox.Attribute) {
 	}
 }
 
+// Elem is a UI element
 type Elem interface {
 	maxWidth() int
 	canBeSelected() bool
