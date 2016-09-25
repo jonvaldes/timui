@@ -92,10 +92,12 @@ func (t *TextEdit) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 	if isElemSelected && state.InputChar != 0 {
 		*t.Text += string(state.InputChar)
 		state.InputChar = 0
+		state.NeedsRedraw = true
 	}
 
 	if isElemSelected && state.KeyState[termbox.KeySpace] {
 		*t.Text += " "
+		state.NeedsRedraw = true
 	}
 
 	if isElemSelected &&
@@ -103,13 +105,14 @@ func (t *TextEdit) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 		(state.KeyState[termbox.KeyBackspace] ||
 			state.KeyState[termbox.KeyBackspace2]) {
 		*t.Text = (*t.Text)[:len(*t.Text)-1]
+		state.NeedsRedraw = true
 	}
 
 	termbox.SetCell(pos.x, pos.y, '[', fgColor, state.Colors.Default)
-	termbox.SetCell(pos.x+maxWidth, pos.y, ']', fgColor, state.Colors.Default)
+	termbox.SetCell(pos.x+maxWidth-1, pos.y, ']', fgColor, state.Colors.Default)
 
 	WriteText(pos.x+1, pos.y, *t.Text, fgColor, state.Colors.Default)
-	for x := 1 + len(*t.Text); x < maxWidth; x++ {
+	for x := 1 + len(*t.Text); x < maxWidth-1; x++ {
 		// ․‥…▁
 		termbox.SetCell(pos.x+x, pos.y, '․', state.Colors.Default, state.Colors.Default)
 	}
