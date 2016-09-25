@@ -60,24 +60,30 @@ func WriteText(x, y int, text string, fg, bg termbox.Attribute) {
 
 // Elem is a UI element
 type Elem interface {
-	maxWidth() int
-	canBeSelected() bool
-	draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool)
+	// MaxWidth returns the maximum with the element expects to need to draw correctly
+	MaxWidth() int
+
+	// CanBeSelected returns whether the element can be manually selected by the user
+	CanBeSelected() bool
+
+	// Draw executes all drawing commands and input handling
+	Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool)
 }
 
+// TextEdit is an element that allows the user to edit a one-line string
 type TextEdit struct {
 	Text *string
 }
 
-func (t *TextEdit) maxWidth() int {
+func (t *TextEdit) MaxWidth() int {
 	return len(*t.Text) + 2
 }
 
-func (t *TextEdit) canBeSelected() bool {
+func (t *TextEdit) CanBeSelected() bool {
 	return true
 }
 
-func (t *TextEdit) draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
+func (t *TextEdit) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
 	fgColor := state.Colors.Default
 	if isElemSelected {
 		fgColor = state.Colors.Cursor
@@ -95,8 +101,8 @@ func (t *TextEdit) draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 	if isElemSelected &&
 		len(*t.Text) > 0 &&
 		(state.KeyState[termbox.KeyBackspace] ||
-		state.KeyState[termbox.KeyBackspace2] ) {
-		*t.Text = (*t.Text)[:len(*t.Text) - 1]
+			state.KeyState[termbox.KeyBackspace2]) {
+		*t.Text = (*t.Text)[:len(*t.Text)-1]
 	}
 
 	termbox.SetCell(pos.x, pos.y, '[', fgColor, state.Colors.Default)
@@ -109,21 +115,22 @@ func (t *TextEdit) draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 	}
 }
 
+// RadioBox is an element that allows the user to select one of several alternatives
 type RadioBox struct {
 	ID    int
 	Value *int
 	Text  string
 }
 
-func (r *RadioBox) maxWidth() int {
+func (r *RadioBox) MaxWidth() int {
 	return len(r.Text) + 4
 }
 
-func (r *RadioBox) canBeSelected() bool {
+func (r *RadioBox) CanBeSelected() bool {
 	return true
 }
 
-func (r *RadioBox) draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
+func (r *RadioBox) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
 	if isElemSelected && state.KeyState[termbox.KeySpace] {
 		*r.Value = r.ID
 		state.NeedsRedraw = true
@@ -148,19 +155,20 @@ func (r *RadioBox) draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 	}
 }
 
+// Separator is a visual element with no interactive functionality.
 type Separator struct {
 	Text string
 }
 
-func (s *Separator) maxWidth() int {
+func (s *Separator) MaxWidth() int {
 	return len(s.Text)
 }
 
-func (s *Separator) canBeSelected() bool {
+func (s *Separator) CanBeSelected() bool {
 	return false
 }
 
-func (s *Separator) draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
+func (s *Separator) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
 	fgColor := state.Colors.Default
 	if isBoxSelected {
 		fgColor = state.Colors.Selected
@@ -175,20 +183,21 @@ func (s *Separator) draw(state *State, pos Coords, maxWidth int, isBoxSelected, 
 	WriteText(pos.x+textPos, pos.y, s.Text, fgColor, state.Colors.Default)
 }
 
+// Button is an element that allows for running arbitrary code when pressed
 type Button struct {
 	Text     string
 	Callback func()
 }
 
-func (b *Button) maxWidth() int {
+func (b *Button) MaxWidth() int {
 	return len(b.Text)
 }
 
-func (b *Button) canBeSelected() bool {
+func (b *Button) CanBeSelected() bool {
 	return true
 }
 
-func (b *Button) draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
+func (b *Button) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
 
 	fgColor := state.Colors.Default
 	bgColor := state.Colors.Default
@@ -203,20 +212,21 @@ func (b *Button) draw(state *State, pos Coords, maxWidth int, isBoxSelected, isE
 	WriteText(pos.x+textPos, pos.y, b.Text, fgColor, bgColor)
 }
 
+// CheckBox is an element that allows the user to toggle a boolean value
 type CheckBox struct {
 	Value *bool
 	Text  string
 }
 
-func (c *CheckBox) maxWidth() int {
+func (c *CheckBox) MaxWidth() int {
 	return len(c.Text) + 4 // "[X] <text>"
 }
 
-func (c *CheckBox) canBeSelected() bool {
+func (c *CheckBox) CanBeSelected() bool {
 	return true
 }
 
-func (c *CheckBox) draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
+func (c *CheckBox) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
 	if isElemSelected && state.KeyState[termbox.KeySpace] {
 		*c.Value = !*c.Value
 	}
@@ -239,6 +249,27 @@ func (c *CheckBox) draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 	WriteText(pos.x, pos.y, brackets+c.Text, fgColor, bgColor)
 }
 
+// DrawBox draws a rectangular box with the given size, title and attributes
+func DrawBox(x, y, w, h int, title string, fgColor, bgColor termbox.Attribute) {
+	termbox.SetCell(x, y, '╭', fgColor, bgColor)
+	termbox.SetCell(x+w-1, y, '╮', fgColor, bgColor)
+	termbox.SetCell(x, y+h-1, '╰', fgColor, bgColor)
+	termbox.SetCell(x+w-1, y+h-1, '╯', fgColor, bgColor)
+	for dx := 1; dx < w-1; dx++ {
+		termbox.SetCell(x+dx, y, '─', fgColor, bgColor)
+		termbox.SetCell(x+dx, y+h-1, '─', fgColor, bgColor)
+	}
+
+	for dy := 0; dy < h-2; dy++ {
+		termbox.SetCell(x, y+dy+1, '│', fgColor, bgColor)
+		termbox.SetCell(x+w-1, y+dy+1, '│', fgColor, bgColor)
+	}
+
+	titlePos := (w - len(title)) / 2
+	WriteText(x+titlePos, y, title, fgColor, bgColor)
+}
+
+// Box groups elements visually and functionally.
 func Box(state *State, x, y int, title string, elems ...Elem) {
 
 	bgColor := state.Colors.Default
@@ -248,11 +279,11 @@ func Box(state *State, x, y int, title string, elems ...Elem) {
 	maxWidth := len(title)
 	selectableElems := 0
 	for _, e := range elems {
-		width := e.maxWidth()
+		width := e.MaxWidth()
 		if width > maxWidth {
 			maxWidth = width
 		}
-		if e.canBeSelected() {
+		if e.CanBeSelected() {
 			selectableElems++
 		}
 	}
@@ -297,31 +328,12 @@ func Box(state *State, x, y int, title string, elems ...Elem) {
 	// Draw elements
 	elem := -1
 	for i, e := range elems {
-		if e.canBeSelected() {
+		if e.CanBeSelected() {
 			elem++
 		}
 		elemSelected := (selected && state.Cursor.y == elem)
-		e.draw(state, Coords{x: x + 2, y: y + 1 + i}, maxWidth, selected, elemSelected)
+		e.Draw(state, Coords{x: x + 2, y: y + 1 + i}, maxWidth, selected, elemSelected)
 	}
 
 	state.boxesCnt++
-}
-
-func DrawBox(x, y, w, h int, title string, fgColor, bgColor termbox.Attribute) {
-	termbox.SetCell(x, y, '╭', fgColor, bgColor)
-	termbox.SetCell(x+w-1, y, '╮', fgColor, bgColor)
-	termbox.SetCell(x, y+h-1, '╰', fgColor, bgColor)
-	termbox.SetCell(x+w-1, y+h-1, '╯', fgColor, bgColor)
-	for dx := 1; dx < w-1; dx++ {
-		termbox.SetCell(x+dx, y, '─', fgColor, bgColor)
-		termbox.SetCell(x+dx, y+h-1, '─', fgColor, bgColor)
-	}
-
-	for dy := 0; dy < h-2; dy++ {
-		termbox.SetCell(x, y+dy+1, '│', fgColor, bgColor)
-		termbox.SetCell(x+w-1, y+dy+1, '│', fgColor, bgColor)
-	}
-
-	titlePos := (w - len(title)) / 2
-	WriteText(x+titlePos, y, title, fgColor, bgColor)
 }
