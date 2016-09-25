@@ -6,21 +6,24 @@ import (
 
 // Coords defines screen or UI coordinates
 type Coords struct {
-	x, y int
+	X, Y int
 }
 
 // State carries all global information for the UI
 type State struct {
-	Cursor Coords
-	Colors struct {
+	Cursor      Coords
+	MouseCursor Coords
+	MouseClick  bool
+	Colors      struct {
 		Default  termbox.Attribute
 		Selected termbox.Attribute
 		Cursor   termbox.Attribute
 	}
-	KeyState    map[termbox.Key]bool
-	InputChar   rune
-	NeedsRedraw bool
-	boxesCnt    int
+	KeyState          map[termbox.Key]bool
+	InputChar         rune
+	NeedsRedraw       bool
+	boxesCnt          int
+	CurrentElemCursor Coords
 }
 
 // NewState returns a new State
@@ -32,21 +35,30 @@ func NewState() State {
 
 // HandleEvent registers an event in the UI system
 func (state *State) HandleEvent(ev termbox.Event) {
-	if ev.Type == termbox.EventKey {
+	switch ev.Type {
+	case termbox.EventKey:
 		state.KeyState[ev.Key] = true
 		state.InputChar = ev.Ch
+	case termbox.EventMouse:
+		if ev.Key == termbox.MouseLeft {
+			state.MouseCursor.X = ev.MouseX
+			state.MouseCursor.Y = ev.MouseY
+			state.MouseClick = true
+		}
 	}
 }
 
 // Flush resets the UI for the next frame
 func (state *State) Flush() {
-	if state.Cursor.x >= state.boxesCnt {
-		state.Cursor.x = state.boxesCnt - 1
+	if state.Cursor.X >= state.boxesCnt {
+		state.Cursor.X = state.boxesCnt - 1
 		state.NeedsRedraw = true
 	}
 
 	state.boxesCnt = 0
+	// Reset input
 	state.KeyState = make(map[termbox.Key]bool)
+	state.MouseClick = false
 }
 
 // WriteText writes a line of text at the given position, with the specified attribs
@@ -85,6 +97,7 @@ func (t *TextEdit) CanBeSelected() bool {
 
 func (t *TextEdit) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
 	fgColor := state.Colors.Default
+
 	if isElemSelected {
 		fgColor = state.Colors.Cursor
 	}
@@ -95,7 +108,7 @@ func (t *TextEdit) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 		state.NeedsRedraw = true
 	}
 
-	if isElemSelected && state.KeyState[termbox.KeySpace] {
+	if isElemSelected && (state.KeyState[termbox.KeySpace]){
 		*t.Text += " "
 		state.NeedsRedraw = true
 	}
@@ -108,13 +121,13 @@ func (t *TextEdit) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 		state.NeedsRedraw = true
 	}
 
-	termbox.SetCell(pos.x, pos.y, '[', fgColor, state.Colors.Default)
-	termbox.SetCell(pos.x+maxWidth-1, pos.y, ']', fgColor, state.Colors.Default)
+	termbox.SetCell(pos.X, pos.Y, '[', fgColor, state.Colors.Default)
+	termbox.SetCell(pos.X+maxWidth-1, pos.Y, ']', fgColor, state.Colors.Default)
 
-	WriteText(pos.x+1, pos.y, *t.Text, fgColor, state.Colors.Default)
+	WriteText(pos.X+1, pos.Y, *t.Text, fgColor, state.Colors.Default)
 	for x := 1 + len(*t.Text); x < maxWidth-1; x++ {
 		// ․‥…▁
-		termbox.SetCell(pos.x+x, pos.y, '․', state.Colors.Default, state.Colors.Default)
+		termbox.SetCell(pos.X+x, pos.Y, '․', state.Colors.Default, state.Colors.Default)
 	}
 }
 
@@ -134,7 +147,7 @@ func (r *RadioBox) CanBeSelected() bool {
 }
 
 func (r *RadioBox) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
-	if isElemSelected && state.KeyState[termbox.KeySpace] {
+	if isElemSelected && (state.KeyState[termbox.KeySpace] || state.MouseClick){
 		*r.Value = r.ID
 		state.NeedsRedraw = true
 	}
@@ -148,13 +161,13 @@ func (r *RadioBox) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 	//brackets := "( )"
 	brackets := "❪ ❫ "
 
-	WriteText(pos.x, pos.y, brackets+r.Text, fgColor, bgColor)
+	WriteText(pos.X, pos.Y, brackets+r.Text, fgColor, bgColor)
 
 	// checkMark := '◉'
 	checkMark := '●'
 	// ○
 	if *r.Value == r.ID {
-		termbox.SetCell(pos.x+1, pos.y, checkMark, fgColor, bgColor)
+		termbox.SetCell(pos.X+1, pos.Y, checkMark, fgColor, bgColor)
 	}
 }
 
@@ -177,13 +190,13 @@ func (s *Separator) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, 
 		fgColor = state.Colors.Selected
 	}
 	for dx := -1; dx < maxWidth+1; dx++ {
-		termbox.SetCell(pos.x+dx, pos.y, '─', fgColor, state.Colors.Default)
+		termbox.SetCell(pos.X+dx, pos.Y, '─', fgColor, state.Colors.Default)
 	}
-	termbox.SetCell(pos.x-2, pos.y, '⎬', fgColor, state.Colors.Default)
-	termbox.SetCell(pos.x+maxWidth+1, pos.y, '⎨', fgColor, state.Colors.Default)
+	termbox.SetCell(pos.X-2, pos.Y, '⎬', fgColor, state.Colors.Default)
+	termbox.SetCell(pos.X+maxWidth+1, pos.Y, '⎨', fgColor, state.Colors.Default)
 
 	textPos := (maxWidth - len(s.Text)) / 2
-	WriteText(pos.x+textPos, pos.y, s.Text, fgColor, state.Colors.Default)
+	WriteText(pos.X+textPos, pos.Y, s.Text, fgColor, state.Colors.Default)
 }
 
 // Button is an element that allows for running arbitrary code when pressed
@@ -206,13 +219,13 @@ func (b *Button) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isE
 	bgColor := state.Colors.Default
 
 	if isElemSelected {
-		if state.KeyState[termbox.KeySpace] || state.KeyState[termbox.KeyEnter] {
+		if state.KeyState[termbox.KeySpace] || state.KeyState[termbox.KeyEnter] || state.MouseClick{
 			b.Callback()
 		}
 		bgColor = state.Colors.Selected
 	}
 	textPos := (maxWidth - len(b.Text)) / 2
-	WriteText(pos.x+textPos, pos.y, b.Text, fgColor, bgColor)
+	WriteText(pos.X+textPos, pos.Y, b.Text, fgColor, bgColor)
 }
 
 // CheckBox is an element that allows the user to toggle a boolean value
@@ -230,7 +243,7 @@ func (c *CheckBox) CanBeSelected() bool {
 }
 
 func (c *CheckBox) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, isElemSelected bool) {
-	if isElemSelected && state.KeyState[termbox.KeySpace] {
+	if isElemSelected && (state.KeyState[termbox.KeySpace] || state.MouseClick){
 		*c.Value = !*c.Value
 	}
 
@@ -249,7 +262,7 @@ func (c *CheckBox) Draw(state *State, pos Coords, maxWidth int, isBoxSelected, i
 	if *c.Value {
 		brackets = "[✖]"
 	}
-	WriteText(pos.x, pos.y, brackets+c.Text, fgColor, bgColor)
+	WriteText(pos.X, pos.Y, brackets+c.Text, fgColor, bgColor)
 }
 
 // DrawBox draws a rectangular box with the given size, title and attributes
@@ -272,8 +285,19 @@ func DrawBox(x, y, w, h int, title string, fgColor, bgColor termbox.Attribute) {
 	WriteText(x+titlePos, y, title, fgColor, bgColor)
 }
 
+func checkMouseClick(state *State, pos Coords, width int) bool {
+	return state.MouseCursor.Y == pos.Y &&
+		state.MouseCursor.X >= pos.X &&
+		state.MouseCursor.X <= pos.X+width
+}
+
 // Box groups elements visually and functionally.
 func Box(state *State, x, y int, title string, elems ...Elem) {
+
+	// Make the mouse click visible only to clicked elements
+	pendingMouseClick := state.MouseClick
+	state.MouseClick = false
+
 
 	bgColor := state.Colors.Default
 	fgColor := state.Colors.Default
@@ -291,33 +315,33 @@ func Box(state *State, x, y int, title string, elems ...Elem) {
 		}
 	}
 
-	if state.Cursor.x == state.boxesCnt {
-		if state.KeyState[termbox.KeyArrowUp] && state.Cursor.y > 0 {
-			state.Cursor.y--
+	if state.Cursor.X == state.boxesCnt {
+		if state.KeyState[termbox.KeyArrowUp] && state.Cursor.Y > 0 {
+			state.Cursor.Y--
 		}
 
 		if state.KeyState[termbox.KeyArrowDown] {
-			state.Cursor.y++
+			state.Cursor.Y++
 		}
 
-		if state.Cursor.y >= selectableElems {
-			state.Cursor.y = selectableElems - 1
+		if state.Cursor.Y >= selectableElems {
+			state.Cursor.Y = selectableElems - 1
 		}
 
-		if state.KeyState[termbox.KeyArrowLeft] && state.Cursor.x > 0 {
-			state.Cursor.x--
+		if state.KeyState[termbox.KeyArrowLeft] && state.Cursor.X > 0 {
+			state.Cursor.X--
 			state.KeyState[termbox.KeyArrowLeft] = false
 			state.NeedsRedraw = true
 		}
 
 		if state.KeyState[termbox.KeyArrowRight] {
-			state.Cursor.x++
+			state.Cursor.X++
 			state.KeyState[termbox.KeyArrowRight] = false
 			state.NeedsRedraw = true
 		}
 	}
 
-	selected := state.Cursor.x == state.boxesCnt
+	selected := state.Cursor.X == state.boxesCnt
 	if selected {
 		fgColor = state.Colors.Selected
 	}
@@ -334,9 +358,21 @@ func Box(state *State, x, y int, title string, elems ...Elem) {
 		if e.CanBeSelected() {
 			elem++
 		}
-		elemSelected := (selected && state.Cursor.y == elem)
-		e.Draw(state, Coords{x: x + 2, y: y + 1 + i}, maxWidth, selected, elemSelected)
+		elemSelected := (selected && state.Cursor.Y == elem)
+		elemScreenPos := Coords{x + 2, y + 1 + i}
+		if pendingMouseClick {
+			if checkMouseClick(state, elemScreenPos, maxWidth) {
+				elemSelected = true
+				state.Cursor = Coords{state.boxesCnt, elem}
+				state.NeedsRedraw = true
+				state.MouseClick = true
+				pendingMouseClick = false
+			}
+		}
+		e.Draw(state, elemScreenPos, maxWidth, selected, elemSelected)
+		state.MouseClick = false
 	}
 
 	state.boxesCnt++
+	state.MouseClick = pendingMouseClick
 }

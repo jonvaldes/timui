@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"github.com/nsf/termbox-go"
 	"github.com/jonvaldes/timui"
@@ -17,12 +18,18 @@ type Data struct {
 func redraw(state *timui.State, data *Data) {
 	termbox.Clear(state.Colors.Default, state.Colors.Default)
 
+	mouseX := fmt.Sprintf("%d", state.MouseCursor.X)
+	mouseY := fmt.Sprintf("%d", state.MouseCursor.Y)
+
 	timui.Box(state, 2, 1, "Commands",
 		&timui.CheckBox{&data.tree, "tree"},
 		&timui.CheckBox{&data.ls, "ls"},
+		&timui.Separator{"Mouse coords"},
+		&timui.TextEdit{&mouseX},
+		&timui.TextEdit{&mouseY},
 	)
 
-	timui.Box(state, 16, 1, "Dirs",
+	timui.Box(state, 19, 1, "Dirs",
 		&timui.RadioBox{0, &data.selectedDir, "/"},
 		&timui.RadioBox{1, &data.selectedDir, "~"},
 		&timui.RadioBox{2, &data.selectedDir, "~/Downloads"},
@@ -30,7 +37,7 @@ func redraw(state *timui.State, data *Data) {
 		&timui.TextEdit{&data.otherDir},
 	)
 
-	timui.Box(state, 38, 1, "",
+	timui.Box(state, 40, 1, "",
 		&timui.Button{"Run!", func() {
 			termbox.Close()
 			os.Exit(0)
@@ -43,7 +50,7 @@ func redraw(state *timui.State, data *Data) {
 
 func main() {
 	termbox.Init()
-
+	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
 	data := Data{}
 
 	state := timui.NewState()
